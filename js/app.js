@@ -14,8 +14,9 @@
 
   // ---------- 全局状态 ----------
   var state = {
-    city: LS.get('city', '上海'),
-    prefs: LS.get('prefs', []),
+    city: LS.get('city', '北京'),
+    prefs: LS.get('prefs', []).filter(function (c) { return PREF_CATS.indexOf(c) !== -1; }),
+    cat: LS.get('cat', null),   // 分类筛选 null=全部
     onbDone: LS.get('onbDone', false),
     view: 'feed',
     dateStrip: (function () { var s = LS.get('dateStrip', null); return s === 'today' ? null : s; })(), // null=今天 | 'all' | 'YYYY-MM-DD'
@@ -46,7 +47,7 @@
   function isUpcoming(ev) { return ev.start > todayStr; }
   function matchPref(ev) {
     if (!state.prefs.length) return false;
-    return (ev.tags || []).some(function (t) { return state.prefs.indexOf(t) !== -1; });
+    return state.prefs.indexOf(ev.cat) !== -1;
   }
 
   function feedScore(ev) {
@@ -88,9 +89,24 @@
   // ==================== 顶栏 ====================
   function renderCity() { el.cityLabel.textContent = state.city; }
   $('cityBtn').addEventListener('click', openCityModal);
-  $('onboardCta').addEventListener('click', openPrefModal);
+  $('onboardCta').addEventListener('click', openOnb);
 
   // ==================== 信息流 ====================
+  function renderCatStrip() {
+    var strip = $('catStrip');
+    strip.innerHTML = '';
+    var mk = function (label, cat, active) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'cat-chip' + (active ? ' on' : '');
+      b.textContent = label;
+      b.addEventListener('click', function () { state.cat = cat; LS.set('cat', cat); renderFeed(); });
+      return b;
+    };
+    strip.appendChild(mk('全部', null, !state.cat));
+    PREF_CATS.forEach(function (c) { strip.appendChild(mk(c, c, state.cat === c)); });
+  }
+
   function renderDateStrip() {
     if (!state.dateStrip || state.dateStrip === 'today') state.dateStrip = todayStr;
     var strip = el.dateStrip;
@@ -98,10 +114,10 @@
     var all = document.createElement('button');
     all.type = 'button';
     all.className = 'date-chip' + (state.dateStrip === 'all' ? ' on' : '');
-    all.innerHTML = '<span class="dw">全部</span><span class="dd">ALL</span>';
+    all.innerHTML = '<span class="dw">一周内</span><span class="dd">7D</span>';
     all.addEventListener('click', function () { state.dateStrip = 'all'; LS.set('dateStrip', 'all'); renderFeed(); });
     strip.appendChild(all);
-    for (var i = 0; i < 14; i++) {
+    for (var i = 0; i < 8; i++) {
       var d = addDays(today, i);
       var key = fmt(d);
       var b = document.createElement('button');
@@ -116,8 +132,10 @@
   }
 
   function renderFeed() {
+    renderCatStrip();
     renderDateStrip();
     var list = EVENTS.filter(function (ev) {
+      if (state.cat && ev.cat !== state.cat) return false;
       if (state.dateStrip === 'all') return ev.end >= todayStr;
       return ev.start <= state.dateStrip && ev.end >= state.dateStrip;
     });
@@ -129,7 +147,7 @@
       (groups[key] = groups[key] || []).push(ev);
     });
     var keys = Object.keys(groups).sort();
-    if (!keys.length) { el.feed.innerHTML = '<div class="empty-tip">该日期暂无活动，试试"全部"或换个城市</div>'; return; }
+    if (!keys.length) { el.feed.innerHTML = '<div class="empty-tip">这段时间暂无活动，试试其他日期或换个分类</div>'; return; }
 
     var html = '';
     keys.forEach(function (k) {
@@ -156,14 +174,14 @@
   function prettyDate(s) { return parseInt(s.slice(5, 7), 10) + '月' + parseInt(s.slice(8, 10), 10) + '日'; }
 
   function feedCardHtml(ev) {
-    var r = rankOf(ev.city);
     var saved = state.saved.indexOf(ev.id) !== -1;
     var range = ev.start === ev.end
       ? prettyDate(ev.start)
       : prettyDate(ev.start) + ' - ' + prettyDate(ev.end);
-    var tag = (ev.tags || []).slice(0, 2).map(function (t) { return '<span class="tile">' + t + '</span>'; }).join('');
+    var tag = '<span class="tile ccat">' + esc(ev.cat) + '</span>' +
+      (ev.tags || []).slice(0, 1).map(function (t) { return '<span class="tile">' + t + '</span>'; }).join('');
     return '<article class="feed-card" data-id="' + ev.id + '">' +
-      '<div class="feed-top"><span class="tile rank' + r + '">' + rankLabel(r) + '</span>' + tag + '</div>' +
+      '<div class="feed-top">' + tag + '</div>' +
       '<h3 class="feed-title">' + esc(ev.title) + '</h3>' +
       '<div class="feed-meta"><span><b>' + ev.city + '</b> · ' + esc(ev.venue) + '</span><span>' + range + '</span></div>' +
       '<div class="feed-bottom"><span class="fee">' + esc(ev.fee || '—') + '</span>' +
@@ -294,6 +312,66 @@
     switchView('feed');
   }
 
+  // ==================== 首次引导弹窗 ====================
+  var CAT_ICON = { '漫展动漫': '🎮', '展会': '🎪', '音乐演出': '🎵', '艺术展览': '🎨', '市集美食': '🍜', '亲子': '🧸' };
+
+  function openOnb() {
+    $('onbChips').innerHTML = PREF_CATS.map(function (c) {
+      return '<button type="button" class="onb-chip' + (state.prefs.indexOf(c) !== -1 ? ' on' : '') + '" data-cat="' + c + '">' +
+        '<span class="onb-ic">' + (CAT_ICON[c] || '✨') + '</span><span>' + c + '</span></button>';
+    }).join('');
+    $('onbChips').querySelectorAll('.onb-chip').forEach(function (b) {
+      b.addEventListener('click', function () { toggleChip(b, state.prefs); });
+    });
+    $('onbCard').classList.remove('hidden');
+    $('onbMask').classList.remove('hidden');
+  }
+  function closeOnb() {
+    $('onbCard').classList.add('hidden');
+    $('onbMask').classList.add('hidden');
+  }
+  $('onbDone').addEventListener('click', function () {
+    saveAndToast();
+    closeOnb();
+  });
+  $('onbSkip').addEventListener('click', function () {
+    LS.set('onbDone', true);
+    state.onbDone = true;
+    el.onboard.classList.add('hidden');
+    closeOnb();
+  });
+
+  // ==================== 主办方入驻 ====================
+  function openSponsor() {
+    $('sponsorModal').classList.remove('hidden');
+    $('sponsorMask').classList.remove('hidden');
+  }
+  function closeSponsor() {
+    $('sponsorModal').classList.add('hidden');
+    $('sponsorMask').classList.add('hidden');
+  }
+  $('sponsorCard').addEventListener('click', openSponsor);
+  $('sponsorLink').addEventListener('click', openSponsor);
+  $('spCancel').addEventListener('click', closeSponsor);
+  $('sponsorMask').addEventListener('click', closeSponsor);
+  $('spSubmit').addEventListener('click', function () {
+    var org = $('spOrg').value.trim(), title = $('spTitle').value.trim(),
+        cat = $('spCat').value, start = $('spStart').value,
+        end = $('spEnd').value || start,
+        venue = $('spVenue').value.trim(), fee = $('spFee').value.trim(),
+        desc = $('spDesc').value.trim(), contact = $('spContact').value.trim();
+    if (!org || !title || !cat || !start || !venue || !contact) {
+      toast('请填写主办方、活动名称、类型、日期、地点和联系方式');
+      return;
+    }
+    var apps = LS.get('spApps', []);
+    apps.push({ org: org, title: title, cat: cat, start: start, end: end, venue: venue, fee: fee, desc: desc, contact: contact, at: new Date().toISOString() });
+    LS.set('spApps', apps);
+    toast('申请已提交（演示版），正式版将由审核团队处理上线');
+    closeSponsor();
+    ['spOrg', 'spTitle', 'spCat', 'spStart', 'spEnd', 'spVenue', 'spFee', 'spDesc', 'spContact'].forEach(function (i) { $(i).value = ''; });
+  });
+
   // ==================== 城市弹窗 ====================
   function openCityModal() {
     el.cityList.innerHTML = CITIES.map(function (c) {
@@ -331,14 +409,13 @@
     var ev = EVENTS.find(function (x) { return x.id === id; });
     if (!ev) return;
     state.selEv = ev;
-    var r = rankOf(ev.city);
     var range = ev.start === ev.end
       ? prettyDate(ev.start)
       : prettyDate(ev.start) + ' — ' + prettyDate(ev.end);
-    var tags = (ev.tags || []).map(function (t) { return '<span class="tile">' + t + '</span>'; }).join('');
+    var tags = '<span class="tile ccat">' + esc(ev.cat) + '</span>' +
+      (ev.tags || []).map(function (t) { return '<span class="tile">' + t + '</span>'; }).join('');
     el.sheetBody.innerHTML =
-      '<div class="feed-top">' +
-      '<span class="tile rank' + r + '">' + rankLabel(r) + '</span>' + tags + '</div>' +
+      '<div class="feed-top">' + tags + '</div>' +
       '<h3 class="sheet-title">' + esc(ev.title) + '</h3>' +
       '<div class="sheet-section">' +
       '<div class="row"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><span><b>' + range + '</b></span></div>' +
@@ -434,9 +511,14 @@
 
   // ==================== 初始化 ====================
   function init() {
+    // 城市兜底：老版本可能存了非北京城市，统一回退
+    if (CITIES.indexOf(state.city) === -1) { state.city = CITIES[0]; LS.set('city', state.city); }
     renderCity();
     if (state.onbDone || state.prefs.length) { el.onboard.classList.add('hidden'); }
-    else { el.onboard.classList.remove('hidden'); }
+    else {
+      el.onboard.classList.remove('hidden');
+      openOnb();  // 首次进入自动弹出偏好引导
+    }
     switchView('feed');
   }
   init();

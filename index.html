@@ -22,7 +22,7 @@
       </div>
       <button class="city-btn" id="cityBtn" type="button">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-        <span id="cityLabel">上海</span>
+        <span id="cityLabel">北京</span>
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
       </button>
     </header>
@@ -40,8 +40,17 @@
 
       <!-- 视图：推荐信息流 -->
       <section class="view" id="view-feed">
+        <div class="cat-strip" id="catStrip"></div>
         <div class="date-strip" id="dateStrip"></div>
         <div class="feed" id="feed"></div>
+        <div class="sponsor-card" id="sponsorCard" type="button">
+          <div class="sponsor-ico">＋</div>
+          <div class="sponsor-info">
+            <b>我是主办方</b>
+            <p>想让你的活动被更多人看到？提交后审核上线</p>
+          </div>
+          <span class="sponsor-arrow">›</span>
+        </div>
       </section>
 
       <!-- 视图：日历 -->
@@ -67,6 +76,7 @@
         <p class="prefs-desc">同城活动优先，邻城次之，更远的排后面。</p>
         <div class="city-grid" id="prefCityGrid"></div>
         <button class="save-btn" id="savePrefs" type="button">保存偏好</button>
+        <button class="sponsor-link" id="sponsorLink" type="button">我是主办方 · 申请在平台推广活动</button>
         <div class="prefs-note">数据为演示样例，活动时间地点请以官方发布为准。</div>
       </section>
 
@@ -106,13 +116,59 @@
     <button class="modal-close" id="cityClose" type="button">完成</button>
   </div>
 
-  <!-- 偏好设置弹窗（首次引导用） -->
+  <!-- 首次进入引导弹窗 -->
+  <div class="onb-mask hidden" id="onbMask"></div>
+  <div class="onb-card" id="onbCard" role="dialog" aria-label="设置兴趣偏好">
+    <div class="onb-emoji">👀</div>
+    <h3>平时喜欢逛什么？</h3>
+    <p class="onb-desc">选几个感兴趣的类别，同类型活动会优先推给你（可随时在「偏好」里修改）</p>
+    <div class="onb-chips" id="onbChips"></div>
+    <button class="save-btn" id="onbDone" type="button">完成，开始发现</button>
+    <button class="onb-skip" id="onbSkip" type="button">先随便逛逛</button>
+  </div>
+
+  <!-- 偏好设置弹窗 -->
   <div class="modal-mask hidden" id="prefMask"></div>
   <div class="modal" id="prefModal" role="dialog" aria-label="设置偏好">
     <h3>设置兴趣偏好</h3>
     <p class="modal-desc">选择感兴趣的类别，我们会优先推送同类活动</p>
     <div class="chip-wrap" id="prefModalChips"></div>
     <button class="modal-close" id="prefModalClose" type="button">保存并开始</button>
+  </div>
+
+  <!-- 主办方入驻申请弹窗 -->
+  <div class="modal-mask hidden" id="sponsorMask"></div>
+  <div class="modal" id="sponsorModal" role="dialog" aria-label="主办方入驻申请">
+    <h3>主办方入驻申请</h3>
+    <p class="modal-desc">提交活动信息，审核通过后将在「身边有展」上线推广。当前为演示版，提交内容仅保存在本机。</p>
+    <div class="form">
+      <label>主办方 / 机构名称<input type="text" id="spOrg" placeholder="如：某某文化传媒" /></label>
+      <label>活动名称<input type="text" id="spTitle" placeholder="如：城市漫展 2026" /></label>
+      <label>活动类型
+        <select id="spCat">
+          <option value="">请选择</option>
+          <option>漫展动漫</option>
+          <option>展会</option>
+          <option>音乐演出</option>
+          <option>艺术展览</option>
+          <option>市集美食</option>
+          <option>亲子</option>
+        </select>
+      </label>
+      <label>活动日期
+        <div class="form-row">
+          <input type="date" id="spStart" />
+          <span>至</span>
+          <input type="date" id="spEnd" />
+        </div>
+      </label>
+      <label>活动地点<input type="text" id="spVenue" placeholder="如：朝阳区XX场馆" /></label>
+      <label>门票说明<input type="text" id="spFee" placeholder="如：免费 / 49元起" /></label>
+      <label>活动介绍<textarea id="spDesc" rows="3" placeholder="用一两句话介绍活动亮点"></textarea></label>
+      <label>联系方式（电话 / 微信）<input type="text" id="spContact" placeholder="审核人员会通过它联系你" /></label>
+    </div>
+    <button class="modal-close" id="spSubmit" type="button">提交申请</button>
+    <button class="onb-skip" id="spCancel" type="button">取消</button>
   </div>
 
   <script src="data/events.js"></script>
